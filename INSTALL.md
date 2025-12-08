@@ -37,8 +37,8 @@ sudo su - tiktok
 ## 4. Клонирование и настройка проекта
 
 ```bash
-# Клонирование репозитория (замените URL на ваш)
-git clone <your-repo-url> ~/tiktok-monitor
+# Клонирование репозитория
+git clone https://github.com/ruenh/tiktok-monitor.git ~/tiktok-monitor
 cd ~/tiktok-monitor
 
 # Установка зависимостей
