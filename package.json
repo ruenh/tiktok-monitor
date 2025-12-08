@@ -1,0 +1,31 @@
+{
+  "name": "tiktok-monitor",
+  "version": "1.0.0",
+  "description": "TikTok author monitoring system with n8n webhook integration",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest --run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "tiktok",
+    "monitor",
+    "webhook",
+    "n8n"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "fast-check": "^3.14.0",
+    "tsx": "^4.6.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+}

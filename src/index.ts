@@ -1,0 +1,218 @@
+#!/usr/bin/env node
+// TikTok Monitor - Main entry point
+// Requirements: 1.4, 2.1
+
+import { ConfigManager } from "./config/index.js";
+import { StateManager } from "./state/index.js";
+import { TikTokScraper } from "./scraper/index.js";
+import { WebhookClient } from "./webhook/index.js";
+import { PollingScheduler } from "./scheduler/index.js";
+import { runCLI } from "./cli/index.js";
+
+// Application version
+const VERSION = "1.0.0";
+
+// Logger utility
+function log(message: string): void {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${message}`);
+}
+
+function logError(message: string): void {
+  const timestamp = new Date().toISOString();
+  console.error(`[${timestamp}] ERROR: ${message}`);
+}
+
+// Global instances for graceful shutdown
+let scheduler: PollingScheduler | null = null;
+let isShuttingDown = false;
+
+/**
+ * Initialize all application components
+ * Requirements: 1.4
+ */
+async function initializeComponents(): Promise<{
+  configManager: ConfigManager;
+  stateManager: StateManager;
+  scraper: TikTokScraper;
+  webhookClient: WebhookClient;
+  scheduler: PollingScheduler;
+}> {
+  log("Initializing components...");
+
+  // Initialize ConfigManager and load configuration
+  const configManager = new ConfigManager();
+  await configManager.load();
+  log("Configuration loaded");
+
+  // Initialize StateManager and load state
+  const stateManager = new StateManager();
+  await stateManager.load();
+  log("State loaded");
+
+  // Initialize TikTokScraper
+  const scraper = new TikTokScraper();
+  log("TikTok scraper initialized");
+
+  // Initialize WebhookClient with configured URL
+  const config = configManager.getConfig();
+  const webhookClient = new WebhookClient(config.webhookUrl);
+  log("Webhook client initialized");
+
+  // Initialize PollingScheduler
+  const pollingScheduler = new PollingScheduler({
+    configManager,
+    stateManager,
+    scraper,
+    webhookClient,
+    logger: log,
+  });
+  log("Polling scheduler initialized");
+
+  return {
+    configManager,
+    stateManager,
+    scraper,
+    webhookClient,
+    scheduler: pollingScheduler,
+  };
+}
+
+/**
+ * Set up graceful shutdown handlers
+ * Requirements: 1.4
+ */
+function setupGracefulShutdown(
+  scheduler: PollingScheduler,
+  stateManager: StateManager
+): void {
+  const shutdown = async (signal: string): Promise<void> => {
+    if (isShuttingDown) {
+      log("Shutdown already in progress...");
+      return;
+    }
+
+    isShuttingDown = true;
+    log(`Received ${signal}. Starting graceful shutdown...`);
+
+    try {
+      // Stop the scheduler
+      if (scheduler.isRunning()) {
+        scheduler.stop();
+        log("Polling scheduler stopped");
+      }
+
+      // Save state before exit
+      await stateManager.save();
+      log("State saved");
+
+      log("Graceful shutdown completed");
+      process.exit(0);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logError(`Error during shutdown: ${message}`);
+      process.exit(1);
+    }
+  };
+
+  // Handle termination signals
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+  // Handle uncaught exceptions
+  process.on("uncaughtException", (error) => {
+    logError(`Uncaught exception: ${error.message}`);
+    shutdown("uncaughtException");
+  });
+
+  // Handle unhandled promise rejections
+  process.on("unhandledRejection", (reason) => {
+    const message = reason instanceof Error ? reason.message : String(reason);
+    logError(`Unhandled rejection: ${message}`);
+    shutdown("unhandledRejection");
+  });
+}
+
+/**
+ * Start the monitoring service (daemon mode)
+ * Requirements: 2.1
+ */
+async function startDaemon(): Promise<void> {
+  log(`TikTok Monitor v${VERSION} starting...`);
+
+  try {
+    const components = await initializeComponents();
+    scheduler = components.scheduler;
+
+    // Set up graceful shutdown
+    setupGracefulShutdown(scheduler, components.stateManager);
+
+    const config = components.configManager.getConfig();
+
+    // Validate configuration before starting
+    if (!config.webhookUrl) {
+      logError("Webhook URL is not configured. Use CLI to set it first.");
+      process.exit(1);
+    }
+
+    if (config.authors.length === 0) {
+      logError("No authors configured. Use CLI to add authors first.");
+      process.exit(1);
+    }
+
+    // Log startup information
+    log("=== Configuration ===");
+    log(`Webhook URL: ${config.webhookUrl}`);
+    log(`Polling Interval: ${config.pollingInterval}s`);
+    log(`Max Retries: ${config.maxRetries}`);
+    log(`Authors: ${config.authors.join(", ")}`);
+    log("=====================");
+
+    // Start the scheduler
+    scheduler.start();
+    log("Monitoring started. Press Ctrl+C to stop.");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logError(`Failed to start: ${message}`);
+    process.exit(1);
+  }
+}
+
+/**
+ * Main entry point
+ */
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+
+  // If no arguments or "daemon" argument, start in daemon mode
+  if (args.length === 0 || args[0] === "daemon") {
+    await startDaemon();
+    return;
+  }
+
+  // Otherwise, run CLI commands
+  try {
+    await runCLI(args);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logError(message);
+    process.exit(1);
+  }
+}
+
+// Run the application
+main().catch((error) => {
+  const message = error instanceof Error ? error.message : String(error);
+  logError(`Fatal error: ${message}`);
+  process.exit(1);
+});
+
+// Export for testing
+export {
+  initializeComponents,
+  setupGracefulShutdown,
+  startDaemon,
+  log,
+  logError,
+  VERSION,
+};
