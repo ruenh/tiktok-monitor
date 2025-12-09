@@ -219,9 +219,19 @@ async function startWebServer(): Promise<void> {
     // Get port from environment or default to 3000
     const port = parseInt(process.env.PORT || "3000", 10);
 
-    // Start the API server
-    await startApiServer(app, port);
-    log(`Web UI available at http://localhost:${port}`);
+    // Start the API server and keep it running
+    const server = app.listen(port, () => {
+      log(`API server running on port ${port}`);
+      log(`Web UI available at http://localhost:${port}`);
+    });
+
+    // Keep process alive by storing server reference
+    process.on("SIGTERM", () => {
+      server.close(() => {
+        log("Server closed");
+        process.exit(0);
+      });
+    });
 
     // Optionally start monitoring if configured
     const config = components.configManager.getConfig();
