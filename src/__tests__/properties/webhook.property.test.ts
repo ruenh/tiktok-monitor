@@ -127,10 +127,21 @@ describe("Webhook Property Tests", () => {
     const webhookPayloadGen: fc.Arbitrary<WebhookPayload> = fc.record({
       videoId: fc.string({ minLength: 1, maxLength: 50 }),
       videoUrl: fc.webUrl(),
+      downloadUrl: fc.webUrl(),
       description: fc.string({ minLength: 0, maxLength: 500 }),
       author: fc.string({ minLength: 1, maxLength: 24 }),
       publishedAt: fc.date().map((d) => d.toISOString()),
       thumbnailUrl: fc.option(fc.webUrl(), { nil: undefined }),
+      duration: fc.option(fc.integer({ min: 1, max: 600 }), { nil: undefined }),
+      stats: fc.option(
+        fc.record({
+          plays: fc.integer({ min: 0 }),
+          likes: fc.integer({ min: 0 }),
+          comments: fc.integer({ min: 0 }),
+          shares: fc.integer({ min: 0 }),
+        }),
+        { nil: undefined }
+      ),
     });
 
     // No-op sleep function for fast testing

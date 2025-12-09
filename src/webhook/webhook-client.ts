@@ -10,10 +10,18 @@ import { VideoMetadata } from "../scraper/tiktok-scraper.js";
 export interface WebhookPayload {
   videoId: string;
   videoUrl: string;
+  downloadUrl: string;
   description: string;
   author: string;
   publishedAt: string;
   thumbnailUrl?: string;
+  duration?: number;
+  stats?: {
+    plays: number;
+    likes: number;
+    comments: number;
+    shares: number;
+  };
 }
 
 /**
@@ -61,10 +69,13 @@ export class WebhookClient {
     return {
       videoId: video.id,
       videoUrl: video.url,
+      downloadUrl: video.downloadUrl,
       description: video.description,
       author: video.author,
       publishedAt: video.publishedAt.toISOString(),
       thumbnailUrl: video.thumbnailUrl,
+      duration: video.duration,
+      stats: video.stats,
     };
   }
 

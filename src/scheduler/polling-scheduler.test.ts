@@ -85,10 +85,13 @@ function createMockWebhookClient(successResult = true): WebhookClient {
       (video: VideoMetadata): WebhookPayload => ({
         videoId: video.id,
         videoUrl: video.url,
+        downloadUrl: video.downloadUrl,
         description: video.description,
         author: video.author,
         publishedAt: video.publishedAt.toISOString(),
         thumbnailUrl: video.thumbnailUrl,
+        duration: video.duration,
+        stats: video.stats,
       })
     ),
     setWebhookUrl: vi.fn(),

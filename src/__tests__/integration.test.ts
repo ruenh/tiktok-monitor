@@ -115,10 +115,13 @@ describe("Integration Tests", () => {
           (video: VideoMetadata): WebhookPayload => ({
             videoId: video.id,
             videoUrl: video.url,
+            downloadUrl: video.downloadUrl,
             description: video.description,
             author: video.author,
             publishedAt: video.publishedAt.toISOString(),
             thumbnailUrl: video.thumbnailUrl,
+            duration: video.duration,
+            stats: video.stats,
           })
         ),
         setWebhookUrl: vi.fn(),
@@ -211,10 +214,13 @@ describe("Integration Tests", () => {
           (video: VideoMetadata): WebhookPayload => ({
             videoId: video.id,
             videoUrl: video.url,
+            downloadUrl: video.downloadUrl,
             description: video.description,
             author: video.author,
             publishedAt: video.publishedAt.toISOString(),
             thumbnailUrl: video.thumbnailUrl,
+            duration: video.duration,
+            stats: video.stats,
           })
         ),
         setWebhookUrl: vi.fn(),
@@ -370,10 +376,13 @@ describe("Integration Tests", () => {
             (video: VideoMetadata): WebhookPayload => ({
               videoId: video.id,
               videoUrl: video.url,
+              downloadUrl: video.downloadUrl,
               description: video.description,
               author: video.author,
               publishedAt: video.publishedAt.toISOString(),
               thumbnailUrl: video.thumbnailUrl,
+              duration: video.duration,
+              stats: video.stats,
             })
           ),
           setWebhookUrl: vi.fn(),
