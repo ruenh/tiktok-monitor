@@ -103,7 +103,11 @@ export class TikTokScraper {
       }
 
       const videos = response.data.data?.videos || [];
-      return videos.map((video) => this.mapTikWMVideo(video, username));
+
+      // Filter out videos without valid ID and map to metadata
+      return videos
+        .filter((video) => video && (video.id || (video as any).video_id))
+        .map((video) => this.mapTikWMVideo(video, username));
     } catch (error) {
       if (error instanceof AxiosError) {
         if (error.response?.status === 429) {
@@ -178,20 +182,24 @@ export class TikTokScraper {
    * Maps TikWM API response to VideoMetadata
    */
   private mapTikWMVideo(video: TikWMVideo, author: string): VideoMetadata {
+    // TikWM API may return id as 'id' or 'video_id'
+    const videoId = video.id || (video as any).video_id || "";
+
     return {
-      id: video.id,
-      url: `https://www.tiktok.com/@${author}/video/${video.id}`,
-      downloadUrl: video.play,
-      description: video.title || "",
+      id: videoId,
+      url: `https://www.tiktok.com/@${author}/video/${videoId}`,
+      downloadUrl:
+        video.play || (video as any).wmplay || (video as any).hdplay || "",
+      description: video.title || (video as any).desc || "",
       author: author,
-      publishedAt: new Date(video.create_time * 1000),
-      thumbnailUrl: video.cover,
-      duration: video.duration,
+      publishedAt: new Date((video.create_time || 0) * 1000),
+      thumbnailUrl: video.cover || (video as any).origin_cover || "",
+      duration: video.duration || 0,
       stats: {
-        plays: video.play_count || 0,
-        likes: video.digg_count || 0,
-        comments: video.comment_count || 0,
-        shares: video.share_count || 0,
+        plays: video.play_count || (video as any).playCount || 0,
+        likes: video.digg_count || (video as any).diggCount || 0,
+        comments: video.comment_count || (video as any).commentCount || 0,
+        shares: video.share_count || (video as any).shareCount || 0,
       },
     };
   }
