@@ -3,12 +3,16 @@
  * Requirements: 3.1, 3.2, 3.3, 3.4
  */
 import { Router, Request, Response } from "express";
+import axios from "axios";
 import {
   successResponse,
   errorResponse,
   ErrorCode,
 } from "../utils/response.js";
 import { StateManager, ProcessedVideo } from "../../state/state-manager.js";
+import { TikTokScraper } from "../../scraper/tiktok-scraper.js";
+import { WebhookClient } from "../../webhook/webhook-client.js";
+import { ConfigManager } from "../../config/config-manager.js";
 
 export interface VideoHistoryItem {
   videoId: string;
@@ -28,6 +32,7 @@ export interface PaginatedResponse<T> {
 
 export interface HistoryRouteDependencies {
   stateManager: StateManager;
+  configManager: ConfigManager;
 }
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -38,7 +43,7 @@ const MAX_PAGE_SIZE = 100;
  */
 export function createHistoryRouter(deps: HistoryRouteDependencies): Router {
   const router = Router();
-  const { stateManager } = deps;
+  const { stateManager, configManager } = deps;
 
   /**
    * GET /api/v1/history
@@ -137,6 +142,124 @@ export function createHistoryRouter(deps: HistoryRouteDependencies): Router {
       };
 
       res.json(successResponse(response));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      res.status(500).json(errorResponse(ErrorCode.INTERNAL_ERROR, message));
+    }
+  });
+
+  /**
+   * POST /api/v1/history/:videoId/resend
+   * Resend video to webhook (test or production)
+   *
+   * Body params:
+   * - target: "test" | "production" (required)
+   */
+  router.post("/:videoId/resend", async (req: Request, res: Response) => {
+    try {
+      const { videoId } = req.params;
+      const { target } = req.body;
+
+      if (!target || !["test", "production"].includes(target)) {
+        res
+          .status(400)
+          .json(
+            errorResponse(
+              ErrorCode.VALIDATION_ERROR,
+              "Target must be 'test' or 'production'"
+            )
+          );
+        return;
+      }
+
+      // Get video from history
+      const history = stateManager.getHistory(100);
+      const video = history.find((v) => v.videoId === videoId);
+
+      if (!video) {
+        res
+          .status(404)
+          .json(
+            errorResponse(ErrorCode.NOT_FOUND, "Video not found in history")
+          );
+        return;
+      }
+
+      // Get webhook URL from config
+
+      const config = configManager.getConfig();
+      const baseUrl = config.webhookUrl.replace(
+        "/webhook/",
+        "/webhook" + (target === "test" ? "-test" : "") + "/"
+      );
+
+      // Determine webhook URL based on target
+      let webhookUrl: string;
+      if (target === "test") {
+        webhookUrl = config.webhookUrl.replace("/webhook/", "/webhook-test/");
+      } else {
+        webhookUrl = config.webhookUrl;
+      }
+
+      // Fetch fresh video data from TikTok
+      const scraper = new TikTokScraper();
+      const videoData = await scraper.getVideoById(videoId);
+
+      if (!videoData) {
+        // If can't fetch fresh data, send basic payload
+        const basicPayload = {
+          videoId: video.videoId,
+          videoUrl: `https://www.tiktok.com/@${video.author}/video/${video.videoId}`,
+          downloadUrl: "",
+          description: "",
+          author: video.author,
+          publishedAt:
+            video.processedAt instanceof Date
+              ? video.processedAt.toISOString()
+              : video.processedAt,
+          thumbnailUrl: "",
+        };
+
+        const response = await axios.post(webhookUrl, basicPayload, {
+          timeout: 30000,
+          headers: { "Content-Type": "application/json" },
+        });
+
+        res.json(
+          successResponse({
+            message: `Video resent to ${target} webhook (basic data)`,
+            statusCode: response.status,
+            webhookUrl,
+          })
+        );
+        return;
+      }
+
+      // Create full payload with fresh data
+      const payload = {
+        videoId: videoData.id,
+        videoUrl: videoData.url,
+        downloadUrl: videoData.downloadUrl,
+        description: videoData.description,
+        author: videoData.author,
+        publishedAt: videoData.publishedAt.toISOString(),
+        thumbnailUrl: videoData.thumbnailUrl,
+        duration: videoData.duration,
+        stats: videoData.stats,
+      };
+
+      const response = await axios.post(webhookUrl, payload, {
+        timeout: 30000,
+        headers: { "Content-Type": "application/json" },
+      });
+
+      res.json(
+        successResponse({
+          message: `Video resent to ${target} webhook`,
+          statusCode: response.status,
+          webhookUrl,
+        })
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       res.status(500).json(errorResponse(ErrorCode.INTERNAL_ERROR, message));

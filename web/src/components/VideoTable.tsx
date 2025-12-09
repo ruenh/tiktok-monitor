@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { VideoHistoryItem } from "../api/client";
+import api, { ApiResponse } from "../api/client";
 import "./VideoTable.css";
 
 interface VideoTableProps {
@@ -9,6 +11,7 @@ interface VideoTableProps {
   totalPages: number;
   onPageChange: (page: number) => void;
   loading?: boolean;
+  onResend?: () => void;
 }
 
 function VideoTable({
@@ -19,10 +22,39 @@ function VideoTable({
   totalPages,
   onPageChange,
   loading = false,
+  onResend,
 }: VideoTableProps) {
+  const [resending, setResending] = useState<string | null>(null);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
+
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr);
     return date.toLocaleString();
+  };
+
+  const handleResend = async (
+    videoId: string,
+    target: "test" | "production"
+  ) => {
+    setResending(`${videoId}-${target}`);
+    setResendMessage(null);
+    try {
+      const response = await api.post<ApiResponse<{ message: string }>>(
+        `/history/${videoId}/resend`,
+        { target }
+      );
+      if (response.data.success) {
+        setResendMessage(`✓ Sent to ${target}`);
+        if (onResend) onResend();
+      } else {
+        setResendMessage(`✗ ${response.data.error?.message || "Failed"}`);
+      }
+    } catch (err) {
+      setResendMessage("✗ Failed to resend");
+    } finally {
+      setResending(null);
+      setTimeout(() => setResendMessage(null), 3000);
+    }
   };
 
   const getStatusBadgeClass = (status: string): string => {
@@ -58,6 +90,7 @@ function VideoTable({
                 <th>Processed At</th>
                 <th>Status</th>
                 <th>Retries</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -76,10 +109,33 @@ function VideoTable({
                     </span>
                   </td>
                   <td>{item.retryCount}</td>
+                  <td className="video-table__actions">
+                    <button
+                      className="video-table__resend-btn video-table__resend-btn--test"
+                      onClick={() => handleResend(item.videoId, "test")}
+                      disabled={resending === `${item.videoId}-test`}
+                      title="Send to test webhook"
+                    >
+                      {resending === `${item.videoId}-test` ? "..." : "Test"}
+                    </button>
+                    <button
+                      className="video-table__resend-btn video-table__resend-btn--prod"
+                      onClick={() => handleResend(item.videoId, "production")}
+                      disabled={resending === `${item.videoId}-production`}
+                      title="Send to production webhook"
+                    >
+                      {resending === `${item.videoId}-production`
+                        ? "..."
+                        : "Prod"}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {resendMessage && (
+            <div className="video-table__resend-message">{resendMessage}</div>
+          )}
 
           <div className="video-table__pagination">
             <div className="video-table__info">
