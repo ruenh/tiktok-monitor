@@ -45,8 +45,8 @@ export function createApiServer(deps?: ApiServerDependencies): Express {
   // JSON body parser
   app.use(express.json());
 
-  // Ensure all responses have JSON content-type
-  app.use((_req: Request, res: Response, next: NextFunction) => {
+  // Ensure API responses have JSON content-type
+  app.use("/api", (_req: Request, res: Response, next: NextFunction) => {
     res.setHeader("Content-Type", "application/json");
     next();
   });
