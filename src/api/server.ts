@@ -104,7 +104,7 @@ export function serveStaticFiles(app: Express): void {
   app.use(express.static(webDistPath));
 
   // For SPA routing - serve index.html for all non-API routes
-  app.get("*", (req: Request, res: Response, next: NextFunction) => {
+  app.get("/{*splat}", (req: Request, res: Response, next: NextFunction) => {
     // Skip API routes
     if (req.path.startsWith("/api")) {
       return next();
