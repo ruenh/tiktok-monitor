@@ -243,6 +243,9 @@ async function startWebServer(): Promise<void> {
         "Monitoring not started - configure webhook URL and authors via Web UI"
       );
     }
+
+    // Keep the process alive - wait forever
+    await new Promise(() => {});
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logError(`Failed to start web server: ${message}`);
