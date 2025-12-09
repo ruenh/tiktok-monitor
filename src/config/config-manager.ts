@@ -20,7 +20,7 @@ export interface ValidationResult {
 // - Cannot start or end with a period
 // - Cannot have consecutive periods
 const TIKTOK_USERNAME_REGEX =
-  /^(?!.*\.\.)[a-zA-Z0-9][a-zA-Z0-9_.]{0,22}[a-zA-Z0-9_]?$/;
+  /^(?!.*\.\.)(?!.*\.$)[a-zA-Z0-9][a-zA-Z0-9_.]{0,22}[a-zA-Z0-9_]?$/;
 
 const MIN_POLLING_INTERVAL = 60;
 const MAX_POLLING_INTERVAL = 3600;

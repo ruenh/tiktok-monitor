@@ -8,6 +8,13 @@ import { TikTokScraper } from "./scraper/index.js";
 import { WebhookClient } from "./webhook/index.js";
 import { PollingScheduler } from "./scheduler/index.js";
 import { runCLI } from "./cli/index.js";
+import {
+  createApiServer,
+  addErrorHandler,
+  startApiServer,
+  serveStaticFiles,
+} from "./api/index.js";
+import { Logger, getLogger } from "./api/services/logger.js";
 
 // Application version
 const VERSION = "1.0.0";
@@ -179,10 +186,71 @@ async function startDaemon(): Promise<void> {
 }
 
 /**
+ * Start the web server with API and static file serving
+ * Requirements: 1.1
+ */
+async function startWebServer(): Promise<void> {
+  log(`TikTok Monitor Web UI v${VERSION} starting...`);
+
+  try {
+    const components = await initializeComponents();
+    scheduler = components.scheduler;
+
+    // Set up graceful shutdown
+    setupGracefulShutdown(scheduler, components.stateManager);
+
+    // Initialize logger
+    const logger = getLogger();
+
+    // Create API server with dependencies
+    const app = createApiServer({
+      configManager: components.configManager,
+      stateManager: components.stateManager,
+      scheduler: components.scheduler,
+      logger,
+    });
+
+    // Serve static files (React frontend)
+    serveStaticFiles(app);
+
+    // Add error handler (must be after routes and static files)
+    addErrorHandler(app);
+
+    // Get port from environment or default to 3000
+    const port = parseInt(process.env.PORT || "3000", 10);
+
+    // Start the API server
+    await startApiServer(app, port);
+    log(`Web UI available at http://localhost:${port}`);
+
+    // Optionally start monitoring if configured
+    const config = components.configManager.getConfig();
+    if (config.webhookUrl && config.authors.length > 0) {
+      scheduler.start();
+      log("Monitoring service started automatically");
+    } else {
+      log(
+        "Monitoring not started - configure webhook URL and authors via Web UI"
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logError(`Failed to start web server: ${message}`);
+    process.exit(1);
+  }
+}
+
+/**
  * Main entry point
  */
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
+
+  // If "web" argument, start web server with API
+  if (args[0] === "web") {
+    await startWebServer();
+    return;
+  }
 
   // If no arguments or "daemon" argument, start in daemon mode
   if (args.length === 0 || args[0] === "daemon") {
@@ -212,6 +280,7 @@ export {
   initializeComponents,
   setupGracefulShutdown,
   startDaemon,
+  startWebServer,
   log,
   logError,
   VERSION,

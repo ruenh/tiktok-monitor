@@ -41,11 +41,16 @@ sudo su - tiktok
 git clone https://github.com/ruenh/tiktok-monitor.git ~/tiktok-monitor
 cd ~/tiktok-monitor
 
-# Установка зависимостей
+# Установка зависимостей для бэкенда
 npm install
 
-# Сборка проекта
-npm run build
+# Установка зависимостей для веб-интерфейса
+cd web
+npm install
+cd ..
+
+# Сборка всего проекта (бэкенд + фронтенд)
+npm run build:all
 ```
 
 ## 5. Конфигурация
@@ -62,7 +67,9 @@ cat > config.json << 'EOF'
 EOF
 ```
 
-## 6. Настройка systemd сервиса
+## 6. Настройка systemd сервиса (CLI режим)
+
+Для запуска только мониторинга без веб-интерфейса:
 
 ```bash
 # Выход из пользователя tiktok
@@ -98,6 +105,47 @@ sudo systemctl start tiktok-monitor
 
 # Проверка статуса
 sudo systemctl status tiktok-monitor
+```
+
+## 6.1 Настройка systemd сервиса (Web UI режим)
+
+Для запуска с веб-интерфейсом:
+
+```bash
+# Выход из пользователя tiktok
+exit
+
+# Создание systemd unit файла для Web UI
+sudo tee /etc/systemd/system/tiktok-monitor-web.service << 'EOF'
+[Unit]
+Description=TikTok Monitor Web UI Service
+After=network.target
+
+[Service]
+Type=simple
+User=tiktok
+WorkingDirectory=/home/tiktok/tiktok-monitor
+ExecStart=/usr/bin/node dist/index.js web
+Restart=always
+RestartSec=10
+Environment=NODE_ENV=production
+Environment=PORT=3000
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Перезагрузка systemd
+sudo systemctl daemon-reload
+
+# Включение автозапуска
+sudo systemctl enable tiktok-monitor-web
+
+# Запуск сервиса
+sudo systemctl start tiktok-monitor-web
+
+# Проверка статуса
+sudo systemctl status tiktok-monitor-web
 ```
 
 ## 7. Управление сервисом
@@ -163,11 +211,69 @@ node dist/index.js history
 sudo journalctl -u tiktok-monitor -f
 ```
 
+## 11. Настройка Nginx для домена tiktok.odindindindun.ru
+
+```bash
+# Установка Nginx
+sudo apt install -y nginx
+
+# Установка Certbot для SSL
+sudo apt install -y certbot python3-certbot-nginx
+
+# Создание конфигурации Nginx
+sudo tee /etc/nginx/sites-available/tiktok-monitor << 'EOF'
+server {
+    listen 80;
+    server_name tiktok.odindindindun.ru;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+EOF
+
+# Активация конфигурации
+sudo ln -sf /etc/nginx/sites-available/tiktok-monitor /etc/nginx/sites-enabled/
+
+# Проверка конфигурации
+sudo nginx -t
+
+# Перезапуск Nginx
+sudo systemctl restart nginx
+
+# Получение SSL сертификата
+sudo certbot --nginx -d tiktok.odindindindun.ru
+```
+
+После получения SSL сертификата Certbot автоматически обновит конфигурацию Nginx для HTTPS.
+
+## 12. Проверка работы Web UI
+
+```bash
+# Проверка статуса сервиса
+sudo systemctl status tiktok-monitor-web
+
+# Просмотр логов
+sudo journalctl -u tiktok-monitor-web -f
+
+# Открыть в браузере
+# https://tiktok.odindindindun.ru
+```
+
 ## Полезные команды
 
 | Команда                                           | Описание                    |
 | ------------------------------------------------- | --------------------------- |
-| `node dist/index.js start`                        | Запуск мониторинга          |
+| `node dist/index.js start`                        | Запуск мониторинга (CLI)    |
+| `node dist/index.js web`                          | Запуск с Web UI             |
 | `node dist/index.js stop`                         | Остановка                   |
 | `node dist/index.js add-author <username>`        | Добавить автора             |
 | `node dist/index.js remove-author <username>`     | Удалить автора              |
@@ -176,3 +282,16 @@ sudo journalctl -u tiktok-monitor -f
 | `node dist/index.js history`                      | История видео               |
 | `node dist/index.js config webhookUrl <url>`      | Изменить webhook URL        |
 | `node dist/index.js config pollingInterval <sec>` | Изменить интервал (60-3600) |
+
+## npm скрипты
+
+| Команда             | Описание                 |
+| ------------------- | ------------------------ |
+| `npm run build`     | Сборка бэкенда           |
+| `npm run build:web` | Сборка фронтенда         |
+| `npm run build:all` | Сборка всего проекта     |
+| `npm run start`     | Запуск мониторинга (CLI) |
+| `npm run start:web` | Запуск с Web UI          |
+| `npm run dev`       | Разработка (CLI)         |
+| `npm run dev:web`   | Разработка с Web UI      |
+| `npm test`          | Запуск тестов            |

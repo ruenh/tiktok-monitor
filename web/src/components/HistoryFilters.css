@@ -1,0 +1,43 @@
+.history-filters {
+  display: flex;
+  gap: 16px;
+  padding: 20px 24px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+.history-filters__group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.history-filters__label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.history-filters__select {
+  padding: 10px 14px;
+  font-size: 14px;
+  color: #111827;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.history-filters__select:focus {
+  border-color: #3b82f6;
+}
+
+.history-filters__select:hover {
+  border-color: #9ca3af;
+}
