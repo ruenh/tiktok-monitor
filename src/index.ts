@@ -244,8 +244,10 @@ async function startWebServer(): Promise<void> {
       );
     }
 
-    // Keep the process alive - wait forever
-    await new Promise(() => {});
+    // Keep the process alive with a heartbeat interval
+    setInterval(() => {
+      // Heartbeat to keep process alive
+    }, 60000);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logError(`Failed to start web server: ${message}`);
